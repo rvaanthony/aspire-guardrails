@@ -1,0 +1,49 @@
+# Code owners for this repository.
+#
+# REPLACE @YOUR_GITHUB_USER with your GitHub username or team (a team is written
+# @org/team-name). Until you do, GitHub's Settings > Code owners page reports
+# every line as an unknown owner and no reviewer is ever requested — the file is
+# inert rather than wrong, but it buys you nothing.
+#
+# Owners are auto-requested as reviewers when a PR touches their paths. Nothing
+# here blocks a merge until you turn on "Require review from Code Owners" in
+# branch protection, so treat these as routing until a second person has write
+# access.
+#
+# Last match wins, so the specific entries below override the default.
+
+# Default owner for anything not matched more specifically.
+*                           @YOUR_GITHUB_USER
+
+# --- Application layers -----------------------------------------------------
+# The dependency direction is enforced at build time by the layer map in
+# Directory.Build.props; these entries are about who reviews a change to each
+# layer, not about what may reference what.
+/Template.Common/           @YOUR_GITHUB_USER
+/Template.ServiceDefaults/  @YOUR_GITHUB_USER
+/Template.Business/         @YOUR_GITHUB_USER
+/Template.Data/             @YOUR_GITHUB_USER
+/Template.Client/           @YOUR_GITHUB_USER
+/Template.Worker/           @YOUR_GITHUB_USER
+
+# Aspire orchestration: a change here alters how every service is wired and run.
+/Template.AppHost/          @YOUR_GITHUB_USER
+
+# --- Build, CI, and quality gates ------------------------------------------
+# Workflows hold the deploy path and the release process; the layer map and the
+# coverage floors are what keep the architecture and the test suite honest.
+/.github/                   @YOUR_GITHUB_USER
+/Directory.Build.props      @YOUR_GITHUB_USER
+/Directory.Build.targets    @YOUR_GITHUB_USER
+/Directory.Packages.props   @YOUR_GITHUB_USER
+/coverage.runsettings       @YOUR_GITHUB_USER
+/eng/                       @YOUR_GITHUB_USER
+/global.json                @YOUR_GITHUB_USER
+/Template.slnx              @YOUR_GITHUB_USER
+/.editorconfig              @YOUR_GITHUB_USER
+/.dockerignore              @YOUR_GITHUB_USER
+
+# --- Architecture decisions -------------------------------------------------
+# An ADR is the record of why something is the way it is. Reversing one is a
+# deliberate act, not a drive-by edit.
+/docs/adr/                  @YOUR_GITHUB_USER

@@ -1,0 +1,72 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET (build + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      # global.json is the single source of truth for the SDK version, so CI
+      # installs exactly what developers run. A floating '10.x' would let CI
+      # drift onto a feature band nobody has locally, which turns an SDK
+      # regression into a CI-only failure.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+            Directory.Build.props
+            Directory.Build.targets
+            global.json
+
+      - name: Verify
+        shell: pwsh
+        run: ./eng/verify.ps1
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: |
+            **/TestResults/*.trx
+            **/TestResults/**/coverage.cobertura.xml
+          retention-days: 14
+
+  # Guards Template.Client/Dockerfile against the Central Package Management
+  # trap: restore inside the image needs every ProjectReference target present
+  # before `COPY . .`, so the csproj COPY block in that file is hand-maintained.
+  # Add a project reference without updating it and `dotnet build`/`dotnet test`
+  # both stay green while the container build breaks — this job is what notices.
+  #
+  # Not part of the required status check unless you add it to a ruleset; do that
+  # if you deploy the container image.
+  docker:
+    name: Docker (client image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build client image
+        run: docker build -f Template.Client/Dockerfile -t client:ci .

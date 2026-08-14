@@ -1,0 +1,36 @@
+# Code owners for this repository (the dotnet new template itself).
+#
+# Owners are auto-requested as reviewers when a PR touches their paths. Nothing
+# here blocks a merge until branch protection turns on "Require review from Code
+# Owners" — until then these are advisory routing.
+#
+# Last match wins, so the specific entries below override the default.
+#
+# Stamped apps get their own copy from stamp/.github/CODEOWNERS.
+
+# Default owner for anything not matched more specifically.
+*                           @rvaanthony
+
+# --- Templating mechanics ---------------------------------------------------
+# The option matrix, the parameter symbols, and which files ship. A change here
+# affects every future stamped app, and the blast radius is not visible from the
+# diff alone.
+/.template.config/          @rvaanthony
+/stamp/                     @rvaanthony
+
+# --- Build, CI, and quality gates ------------------------------------------
+# The layer map and its build-time validation, the coverage floors, and the
+# single verification gate CI runs.
+/Directory.Build.props      @rvaanthony
+/Directory.Build.targets    @rvaanthony
+/Directory.Packages.props   @rvaanthony
+/coverage.runsettings       @rvaanthony
+/eng/                       @rvaanthony
+/.github/                   @rvaanthony
+/global.json                @rvaanthony
+/Template.slnx              @rvaanthony
+
+# --- Architecture decisions -------------------------------------------------
+# An ADR is the record of why something is the way it is. Reversing one is a
+# deliberate act, not a drive-by edit.
+/docs/adr/                  @rvaanthony

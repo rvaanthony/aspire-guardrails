@@ -1,0 +1,101 @@
+# Starter deploy workflow for Azure App Service (OIDC).
+# Before first use:
+#   1. Create an App Service and an Entra app registration for GitHub OIDC.
+#   2. Set repository secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID.
+#   3. Replace YOUR_APP_NAME below (three places: environment url, app-name,
+#      and the health-check url) and the branch filter if you use release branches.
+#   4. Prefer deploying from a release branch rather than main until you are ready.
+
+name: deploy-azure
+
+on:
+  push:
+    branches:
+      - env/production
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-azure-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Compute version
+        id: version
+        run: |
+          base="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n1)"
+          base="${base:-1.0.0}"
+          value="${base}.${GITHUB_RUN_NUMBER}"
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+          echo "Deploying version $value"
+
+      - name: Publish Client
+        # Publish only the web app. A bare `dotnet publish` at the repo root
+        # publishes every project (tests, AppHost, libraries) into the same folder.
+        run: dotnet publish Template.Client/Template.Client.csproj -c Release -o "${{ runner.temp }}/webapp" -p:Version="${{ steps.version.outputs.value }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: webapp
+          path: ${{ runner.temp }}/webapp
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://YOUR_APP_NAME.azurewebsites.net
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: webapp
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'YOUR_APP_NAME'
+          slot-name: 'Production'
+          package: .
+
+      - name: Health check
+        run: |
+          url="https://YOUR_APP_NAME.azurewebsites.net/health"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 10 "$url"; then
+              echo "Healthy on attempt $attempt"
+              exit 0
+            fi
+            echo "Attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          echo "::error::$url did not report healthy after 5 attempts"
+          exit 1

@@ -1,0 +1,64 @@
+@model Template.Client.Models.ContactFormModel
+@{
+    ViewData["Title"] = "Contact";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+@if (TempData["ContactSent"] is true)
+{
+    <div class="alert alert-success" role="status">Thanks — your message was received.</div>
+}
+
+<form asp-action="Contact" method="post" class="row g-3" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="col-md-6">
+        <label asp-for="Topic" class="form-label"></label>
+        <select asp-for="Topic" class="form-select">
+            <option value="@ContactFormModel.TopicGeneral">General</option>
+            <option value="@ContactFormModel.TopicSupport">Support</option>
+            <option value="@ContactFormModel.TopicFeedback">Feedback</option>
+        </select>
+        <span asp-validation-for="Topic" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" autocomplete="name" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="Email" class="form-label"></label>
+        <input asp-for="Email" class="form-control" autocomplete="email" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="Organization" class="form-label"></label>
+        <input asp-for="Organization" class="form-control" autocomplete="organization" />
+        <span asp-validation-for="Organization" class="text-danger"></span>
+    </div>
+
+    <div class="col-12">
+        <label asp-for="Message" class="form-label"></label>
+        <textarea asp-for="Message" class="form-control" rows="5"></textarea>
+        <span asp-validation-for="Message" class="text-danger"></span>
+    </div>
+
+    @* Honeypot: visually hidden; leave empty. *@
+    <div class="d-none" aria-hidden="true">
+        <label asp-for="Website"></label>
+        <input asp-for="Website" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Send</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

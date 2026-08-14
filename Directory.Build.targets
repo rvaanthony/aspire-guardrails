@@ -1,0 +1,86 @@
+<Project>
+
+  <!--
+    Build-time guardrails. Both catch a mistake that produces no warning, builds clean,
+    and surfaces much later: one in a review that does not happen, the other at runtime
+    in an environment nobody tested. Template.Client.Tests/BuildGuardTests.cs plants
+    each violation and asserts the build rejects it.
+  -->
+
+  <!--
+    Validates every ProjectReference against the layer map in Directory.Build.props: a
+    project may only reference a strictly lower rank.
+
+    Escape hatch, for the rare justified case:
+      <PropertyGroup><EnforceLayering>false</EnforceLayering></PropertyGroup>
+    If you reach for it, leave a comment explaining why.
+  -->
+
+  <Target Name="ValidateLayering"
+          BeforeTargets="Build"
+          Condition="'$(EnforceLayering)' != 'false' AND '@(ProjectReference)' != ''">
+
+    <PropertyGroup>
+      <_LayerSelfRank>@(TemplateLayer->WithMetadataValue('Identity','$(MSBuildProjectName)')->'%(Rank)')</_LayerSelfRank>
+      <_LayerMapNames>;@(TemplateLayer->'%(Identity)', ';');</_LayerMapNames>
+      <_LayerRefNames>;@(ProjectReference->'%(Filename)', ';');</_LayerRefNames>
+    </PropertyGroup>
+
+    <!-- Must come first: the rank comparison below cannot evaluate against an empty
+         self-rank, so an unmapped project has to fail here instead. -->
+    <Error Condition="'$(_LayerSelfRank)' == ''"
+           Code="ARCH0001"
+           Text="Project '$(MSBuildProjectName)' is missing from the layer map. Add a &lt;TemplateLayer Include=&quot;$(MSBuildProjectName)&quot; Rank=&quot;NN&quot; /&gt; entry to Directory.Build.props so its allowed dependencies are declared. See the rank table in the comment above that map." />
+
+    <ItemGroup>
+      <_LayerRefName Include="@(ProjectReference->'%(Filename)')" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_LayerUnmappedRef Include="@(_LayerRefName)"
+                         Condition="!$(_LayerMapNames.Contains(';%(Identity);'))" />
+      <_LayerIllegalRef Include="@(TemplateLayer)"
+                        Condition="$(_LayerRefNames.Contains(';%(Identity);')) AND '%(Rank)' &gt;= '$(_LayerSelfRank)'" />
+    </ItemGroup>
+
+    <!-- Flattened into properties so the Errors below test a property rather than an
+         item list. Every condition in this file must reference at least one MSBuild
+         property to survive intact; the reason is in this repository's CLAUDE.md,
+         because writing the offending syntax out here is itself the problem. -->
+    <PropertyGroup>
+      <_LayerUnmappedList>@(_LayerUnmappedRef, ', ')</_LayerUnmappedList>
+      <_LayerIllegalList>@(_LayerIllegalRef->'%(Identity) (rank %(Rank))', ', ')</_LayerIllegalList>
+    </PropertyGroup>
+
+    <Error Condition="'$(_LayerUnmappedList)' != ''"
+           Code="ARCH0001"
+           Text="Project '$(MSBuildProjectName)' references $(_LayerUnmappedList), which is missing from the layer map in Directory.Build.props. Add a rank for it." />
+
+    <Error Condition="'$(_LayerIllegalList)' != ''"
+           Code="ARCH0002"
+           Text="Illegal layer dependency: '$(MSBuildProjectName)' (rank $(_LayerSelfRank)) may only reference projects of a STRICTLY LOWER rank, but references $(_LayerIllegalList). Two projects at the same rank (the Client and the Worker, for instance) must never reference each other — move the shared code DOWN into Common, Business or Data and reference it from both. See the layer map in Directory.Build.props." />
+
+  </Target>
+
+  <!--
+    InvariantGlobalization=true is silently fatal to anything talking to SQL Server;
+    see the property's comment in Directory.Build.props. Unconditional rather than
+    limited to the SQL Server option, because an app that adds SQL Server later would
+    otherwise inherit the trap with no guard.
+
+    Escape hatch, if a project genuinely has no SQL Server dependency:
+      <PropertyGroup><EnforceGlobalization>false</EnforceGlobalization></PropertyGroup>
+    If you reach for it, leave a comment explaining why.
+  -->
+
+  <Target Name="ValidateGlobalization"
+          BeforeTargets="Build"
+          Condition="'$(EnforceGlobalization)' != 'false'">
+
+    <Error Condition="'$(InvariantGlobalization)' == 'true'"
+           Code="ARCH0003"
+           Text="Project '$(MSBuildProjectName)' sets InvariantGlobalization=true. Microsoft.Data.SqlClient does not support globalization-invariant mode — SqlConnection.TryOpen throws NotSupportedException before it opens a socket, so EVERY database call fails regardless of the connection string or the server, in every environment. Leave it false; see the comment on the property in Directory.Build.props. If this project has no SQL Server dependency, set EnforceGlobalization=false with a comment saying why." />
+
+  </Target>
+
+</Project>

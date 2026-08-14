@@ -1,0 +1,61 @@
+# Static analysis via GitHub CodeQL.
+#
+# Requires GitHub Advanced Security if this repository is private (Settings >
+# Code security > GitHub Advanced Security). Free for public repositories.
+# Delete this workflow if you don't want CodeQL scanning.
+
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  # Private repositories additionally need actions:read — the CodeQL action calls
+  # the workflow-runs API, which 403s ("Resource not accessible by integration")
+  # after a successful analysis without it.
+  actions: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (csharp)
+    # Code scanning has to be enabled in repository settings, and on a private
+    # repository that needs GitHub Advanced Security. Until then the analysis
+    # itself succeeds but *reporting* fails, so every push to a private
+    # repository without GHAS gets a red check for a missing setting rather than
+    # for a defect. Skipping while private means this workflow starts scanning by
+    # itself the day the repository goes public.
+    #
+    # Remove this line to run it on a private repository that does have GHAS.
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: csharp
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:csharp'

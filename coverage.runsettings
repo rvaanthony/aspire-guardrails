@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Coverage collection for `dotnet test`. Picked up automatically: Directory.Build.props
+  sets RunSettingsFilePath for every test project, so a bare `dotnet test` measures the
+  same thing CI measures.
+
+  NOTE FOR EDITORS: a double hyphen cannot appear inside an XML comment. It is not a
+  warning — the file fails to parse, and `dotnet test` then reports a settings error
+  that reads nothing like a punctuation problem.
+
+  The exclusion is applied at COLLECTION time rather than in eng/coverage-floor.ps1 so
+  that the report CI uploads and the number the gate checks are the same number. It
+  also fails safe: delete this file and the excluded code rejoins the denominator, so
+  rates drop and the gate goes red rather than quietly widening.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <!-- friendlyName must match exactly: it is how the collect flag on the command
+           line and this configuration block find each other. -->
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <!-- Stated rather than defaulted: the gate parses cobertura specifically. -->
+          <Format>cobertura</Format>
+
+          <!--
+            The one exclusion. `dotnet ef migrations add` writes generated Up/Down
+            methods, per-migration designer snapshots and a model snapshot into a
+            Migrations namespace, none of which are yours to test, and their coverage
+            would swing on whether a database was reachable.
+
+            A namespace filter rather than an attribute on the files, because an
+            attribute is an edit to generated code that `dotnet ef` would not repeat
+            on the next migration — the exclusion would decay one migration at a time.
+            This also covers migrations that do not exist yet, which in a new solution
+            is all of them.
+
+            Nothing else belongs here. The DbContext, the entities and the stores are
+            hand written and tested; excluding a hand-written type because it is
+            inconvenient to cover is what this filter must never grow into.
+          -->
+          <Exclude>[*]*.Migrations.*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

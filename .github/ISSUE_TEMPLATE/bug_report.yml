@@ -1,0 +1,81 @@
+name: Bug report
+description: Something is wrong with the starter, or with a project generated from it.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The most useful thing you can include is the exact
+        `dotnet new` command you ran — most defects only reproduce under one
+        combination of options, because each option changes which code exists.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead. Paste the error output if there is any.
+      placeholder: |
+        Ran the create command below, then `pwsh ./eng/verify.ps1` in the new project, and the format check failed with ...
+    validations:
+      required: true
+
+  - type: input
+    id: create-command
+    attributes:
+      label: Create command
+      description: The full `dotnet new aspire-web` command, including every option.
+      placeholder: dotnet new aspire-web -n MyProject -o ./MyProject --auth azuread --data postgres
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: How did you install it?
+      options:
+        - From NuGet (dotnet new install RvaAnthony.AspireWeb.Templates)
+        - From a clone (dotnet new install <path>)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: sdk-version
+    attributes:
+      label: .NET SDK version
+      description: Output of `dotnet --version`.
+      placeholder: "10.0.302"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Dev container / Codespaces
+    validations:
+      required: true
+
+  - type: dropdown
+    id: docker
+    attributes:
+      label: Was Docker running?
+      description: The data tests and the full Aspire run both need it, so "no" explains a whole class of failure.
+      options:
+        - "Yes"
+        - "No"
+        - Not relevant to this problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: Logs, a diff, a link to a repository that reproduces it. Drag files in to attach them.
+    validations:
+      required: false

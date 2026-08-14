@@ -1,0 +1,314 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "classifications": ["Web", "MVC", "Aspire"],
+  "identity": "AspireWeb.Layered.CSharp",
+  "name": "Layered Aspire Web Solution",
+  "description": "Layered .NET Aspire web solution: MVC client with rate limiting, security headers, correlation ids, and health checks; Business/Data/Common layers; optional Entra ID, Sentry, and Azure Tables / Postgres / SQL Server; xUnit tests with architecture guardrails.",
+  "shortName": "aspire-web",
+  "sourceName": "Template",
+  "preferNameDirectory": true,
+  "defaultName": "WebApp",
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "guids": [
+    "c140da05-b8bc-4e55-b455-1d129d79a94b",
+    "dfadadd7-0edb-4587-b443-5a4d965ab279",
+    "9b2e6f14-3a7d-4c89-b0e5-6f1d8a4c9b23"
+  ],
+  "primaryOutputs": [
+    { "path": "Template.slnx" }
+  ],
+  "symbols": {
+    "auth": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Authentication for the Client project.",
+      "defaultValue": "none",
+      "choices": [
+        {
+          "choice": "none",
+          "description": "No authentication."
+        },
+        {
+          "choice": "azuread",
+          "description": "Cookie sign-in with Microsoft Entra ID via Microsoft.Identity.Web; all controllers require an authenticated user by default."
+        }
+      ]
+    },
+    "logging": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Error tracking / logging extras for the Client project.",
+      "defaultValue": "none",
+      "choices": [
+        {
+          "choice": "none",
+          "description": "No third-party error tracking."
+        },
+        {
+          "choice": "sentry",
+          "description": "Wire Sentry.AspNetCore (DSN from configuration; empty DSN disables)."
+        }
+      ]
+    },
+    "data": {
+      "type": "parameter",
+      "datatype": "choice",
+      "description": "Persistence backend wired through AppHost + Template.Data.",
+      "defaultValue": "tables",
+      "choices": [
+        {
+          "choice": "tables",
+          "description": "Azure Tables/Blobs/Queues via Aspire (Azurite in Development)."
+        },
+        {
+          "choice": "postgres",
+          "description": "EF Core + PostgreSQL via Aspire."
+        },
+        {
+          "choice": "sqlserver",
+          "description": "EF Core + SQL Server via Aspire."
+        },
+        {
+          "choice": "efcore",
+          "description": "Alias for postgres (kept for older docs/scripts)."
+        }
+      ]
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Skip the automatic 'dotnet restore' that normally runs right after the project is created."
+    },
+    "worker": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Add a Template.Worker background service project (refs ServiceDefaults/Business/Common/Data) wired into AppHost alongside the Client."
+    },
+    "//portComment": "Ports are generated per created project rather than hardcoded. Without this every project created from this starter would share one set of ports, so two of them could not run at once and a leftover process would block the next run with an opaque bind failure. Each entry replaces the literal port in launchSettings.json and .claude/launch.json, which is what keeps those two files in step.",
+    "dashboardHttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 15000, "high": 15300 },
+      "replaces": "15282"
+    },
+    "dashboardHttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 17000, "high": 17300 },
+      "replaces": "17240"
+    },
+    "otlpHttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 19000, "high": 19300 },
+      "replaces": "19282"
+    },
+    "otlpHttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 21000, "high": 21300 },
+      "replaces": "21253"
+    },
+    "mcpHttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 18000, "high": 18300 },
+      "replaces": "18099"
+    },
+    "mcpHttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 23000, "high": 23300 },
+      "replaces": "23183"
+    },
+    "resourceHttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 20000, "high": 20300 },
+      "replaces": "20262"
+    },
+    "resourceHttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 22000, "high": 22300 },
+      "replaces": "22121"
+    },
+    "clientHttpPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 5000, "high": 5300 },
+      "replaces": "5183"
+    },
+    "clientHttpsPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 7000, "high": 7300 },
+      "replaces": "7259"
+    },
+    "//emulatorPortComment": "The storage emulator's host ports. Aspire defaults these to Azurite's well-known 10000-10002, which any already-running Azurite holds — and the failure is a warning followed by a hang, not an error. Generated per project so a pre-existing emulator and a second created project both stay out of the way.",
+    "blobPort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 10810, "high": 10899 },
+      "replaces": "10810"
+    },
+    "queuePort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 10910, "high": 10999 },
+      "replaces": "10811"
+    },
+    "tablePort": {
+      "type": "generated",
+      "generator": "port",
+      "parameters": { "low": 11010, "high": 11099 },
+      "replaces": "10812"
+    },
+    "UseAzureAd": {
+      "type": "computed",
+      "value": "(auth == \"azuread\")"
+    },
+    "UseSentry": {
+      "type": "computed",
+      "value": "(logging == \"sentry\")"
+    },
+    "UsePostgres": {
+      "type": "computed",
+      "value": "(data == \"postgres\" || data == \"efcore\")"
+    },
+    "UseSqlServer": {
+      "type": "computed",
+      "value": "(data == \"sqlserver\")"
+    },
+    "UseEfCore": {
+      "type": "computed",
+      "value": "(data == \"postgres\" || data == \"efcore\" || data == \"sqlserver\")"
+    },
+    "UseWorker": {
+      "type": "computed",
+      "value": "(worker)"
+    }
+  },
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "modifiers": [
+        {
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/.git/**",
+            "**/.vs/**",
+            "**/*.user",
+            "**/TestResults/**",
+            "README.md",
+            "LICENSE",
+            ".github/**",
+            ".devcontainer/**",
+            "stamp/**",
+            "CLAUDE.md",
+            "CONTRIBUTING.md",
+            "CODE_OF_CONDUCT.md",
+            "RvaAnthony.AspireWeb.Templates.csproj",
+            ".claude/settings.local.json",
+            "docs/adr/0002-supply-chain-no-lockfiles.md",
+            "docs/adr/0003-stamp-staging.md"
+          ]
+        },
+        {
+          "condition": "(!UseAzureAd)",
+          "exclude": [
+            "Template.Client/Views/Shared/_LoginPartial.cshtml"
+          ]
+        },
+        {
+          "condition": "(UseEfCore)",
+          "exclude": [
+            "Template.Data/Storage/**",
+            "Template.Data/Entities/**",
+            "Template.Data/Stores/ContactSubmissionStore.cs",
+            "Template.Data.Tests/Azurite/**",
+            "Template.Data.Tests/Storage/**",
+            "Template.Data.Tests/Stores/ContactSubmissionStoreTests.cs"
+          ]
+        },
+        {
+          "condition": "(!UseEfCore)",
+          "exclude": [
+            "Template.Data/Persistence/**",
+            "Template.Data.Tests/Postgres/**",
+            "Template.Data.Tests/SqlServer/**",
+            "Template.Data.Tests/Persistence/**",
+            ".config/dotnet-tools.json"
+          ]
+        },
+        {
+          "condition": "(UsePostgres)",
+          "exclude": [
+            "Template.Data.Tests/SqlServer/**"
+          ]
+        },
+        {
+          "condition": "(UseSqlServer)",
+          "exclude": [
+            "Template.Data.Tests/Postgres/**"
+          ]
+        },
+        {
+          "condition": "(!UseWorker)",
+          "exclude": [
+            "Template.Worker/**",
+            "Template.Worker.Tests/**"
+          ]
+        }
+      ]
+    },
+    {
+      "source": "./stamp/",
+      "target": "./"
+    }
+  ],
+  "SpecialCustomOperations": {
+    "**/*.slnx": {
+      "operations": [
+        {
+          "type": "conditional",
+          "configuration": {
+            "endif": [ "#endif", "<!--#endif" ],
+            "actionableIf": [ "<!--#if" ],
+            "actionableElse": [ "#else", "<!--#else" ],
+            "actionableElseif": [ "#elseif", "<!--#elseif", "#elif", "<!--#elif" ],
+            "trim": true,
+            "wholeLine": true,
+            "evaluator": "C++"
+          }
+        }
+      ]
+    }
+  },
+  "postActions": [
+    {
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages",
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true,
+      "manualInstructions": [
+        { "text": "Run 'dotnet restore' inside the new project directory." }
+      ]
+    },
+    {
+      "description": "Next steps",
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true,
+      "manualInstructions": [
+        { "text": "cd into the output directory, run 'git init', then 'dotnet run --project <YourName>.AppHost' (Docker required for the tables/postgres/sqlserver backends). See README.md for full setup, including deploy workflow secrets." }
+      ]
+    }
+  ]
+}

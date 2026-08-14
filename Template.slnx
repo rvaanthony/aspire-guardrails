@@ -1,0 +1,16 @@
+<Solution>
+  <Project Path="Template.AppHost/Template.AppHost.csproj" />
+  <Project Path="Template.AppHost.Tests/Template.AppHost.Tests.csproj" />
+  <Project Path="Template.Business/Template.Business.csproj" />
+  <Project Path="Template.Business.Tests/Template.Business.Tests.csproj" />
+  <Project Path="Template.Client/Template.Client.csproj" />
+  <Project Path="Template.Client.Tests/Template.Client.Tests.csproj" />
+  <Project Path="Template.Common/Template.Common.csproj" />
+  <Project Path="Template.Data/Template.Data.csproj" />
+  <Project Path="Template.Data.Tests/Template.Data.Tests.csproj" />
+  <Project Path="Template.ServiceDefaults/Template.ServiceDefaults.csproj" />
+  <!--#if (UseWorker)-->
+  <Project Path="Template.Worker/Template.Worker.csproj" />
+  <Project Path="Template.Worker.Tests/Template.Worker.Tests.csproj" />
+  <!--#endif-->
+</Solution>

@@ -1,0 +1,84 @@
+<Project>
+
+  <!--
+    Central Package Management: every PackageReference in the solution omits its
+    Version attribute and resolves it from this file, so upgrades happen in one
+    place. https://learn.microsoft.com/nuget/consume-packages/central-package-management
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire -->
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
+
+    <!-- EF Core design-time tooling (referenced only when the data parameter
+         is postgres, sqlserver, or efcore). Pinned to match the EF Core runtime
+         version pulled transitively by the Aspire packages above — keep these
+         in lockstep with each other and with .config/dotnet-tools.json's
+         dotnet-ef version. Moving this ahead of the Aspire-pulled runtime
+         resolves cleanly in NuGet (every EF range is a minimum bound) but then
+         fails MSBuild assembly unification with MSB3277 conflicts between the
+         two EF Core versions. Both are therefore held back in
+         .github/dependabot.yml; move them only when Aspire moves its EF floor. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" />
+
+    <!-- ServiceDefaults -->
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.9.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.9.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+
+    <!-- Shared framework extensions -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.11" />
+
+    <!-- Auth (referenced only when stamped with auth=azuread) -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Identity.Web" Version="4.14.2" />
+    <PackageVersion Include="Microsoft.Identity.Web.UI" Version="4.14.2" />
+
+    <!-- Observability (referenced only when stamped with logging=sentry) -->
+    <PackageVersion Include="Sentry.AspNetCore" Version="6.8.0" />
+
+    <!-- Tooling -->
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+
+    <!-- Tests -->
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="Testcontainers.Azurite" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+
+    <!-- Transitive pins. CentralPackageTransitivePinningEnabled (above) makes a
+         PackageVersion apply to indirect dependencies too, which is how a package
+         nobody references directly gets pulled off a version NuGetAudit flags.
+         Drop each pin once the direct dependency ships a fixed version itself.
+
+         SSH.NET: Testcontainers 4.13.0 (newest at time of writing) still depends
+         on 2025.1.0, which GHSA-q939-rpr3-3284 rates high severity (arbitrary
+         file write via server-controlled SCP filenames). Fixed in 2026.0.0. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+</Project>

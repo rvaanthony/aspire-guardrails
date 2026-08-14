@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json.schemastore.org/ide.host",
+  "order": 0,
+  "symbolInfo": [
+    {
+      "id": "auth",
+      "name": {
+        "text": "Authentication"
+      },
+      "isVisible": true,
+      "defaultValue": "none",
+      "description": {
+        "text": "Sign-in for the MVC client. azuread wires Microsoft Entra ID (Microsoft.Identity.Web) with a global authorize filter."
+      }
+    },
+    {
+      "id": "logging",
+      "name": {
+        "text": "Error tracking"
+      },
+      "isVisible": true,
+      "defaultValue": "none",
+      "description": {
+        "text": "Optional Sentry.AspNetCore integration. Leave Sentry:Dsn empty to disable sending."
+      }
+    },
+    {
+      "id": "data",
+      "name": {
+        "text": "Persistence"
+      },
+      "isVisible": true,
+      "defaultValue": "tables",
+      "description": {
+        "text": "tables = Azure Storage (Azurite in Development). postgres / sqlserver = EF Core via Aspire. efcore is an alias for postgres."
+      }
+    },
+    {
+      "id": "worker",
+      "name": {
+        "text": "Background worker"
+      },
+      "isVisible": true,
+      "defaultValue": "false",
+      "description": {
+        "text": "Add a Worker project (refs ServiceDefaults/Business/Common/Data) wired into AppHost alongside the Client."
+      }
+    }
+  ]
+}

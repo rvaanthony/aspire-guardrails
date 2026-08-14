@@ -1,0 +1,116 @@
+name: Release - Cut RC branch
+
+# Cuts a date-stamped release-candidate branch from main.
+#
+# Naming is CalVer: releases/rc-YYYY.MM.DD, which sorts chronologically forever.
+# A style like rc-MMDD.YY does not — 0616.26 sorts before 0715.25 despite being
+# newer — and a ref list that sorts wrong is a ref list you have to read twice.
+#
+# The branch is a freeze point. Once cut it should only receive deliberate fixes,
+# never a blind fast-forward from main; that is the whole reason it exists.
+#
+# Cutting is intentionally manual. Nothing here runs on a push.
+#
+# Pairs with release-publish.yml, which turns a cut branch into an immutable tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Release date as YYYY-MM-DD. Defaults to today (UTC)."
+        required: false
+        type: string
+      source:
+        description: "Ref to cut from."
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-cut
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source }}
+          fetch-depth: 0
+
+      - name: Guard the source ref
+        env:
+          SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          # Explicit refspec: guarantees refs/remotes/origin/main exists rather
+          # than depending on the remote's configured fetch refspec. Without it
+          # merge-base errors out and the check below refuses for the wrong reason.
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --quiet
+          # `source` is a free-form input, so defaulting it to main guarantees
+          # nothing. A freeze point has to freeze reviewed code: cutting from a
+          # feature branch would put un-merged commits on a releases/* ref, and
+          # release-publish.yml will happily tag a releases/* ref.
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::'$SOURCE' is not contained in main. Release branches \
+          are cut from main only — merge it first."
+            exit 1
+          fi
+          echo "Source '$SOURCE' is contained in main."
+
+      - name: Resolve branch name
+        id: resolve
+        env:
+          DATE: ${{ inputs.date }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          raw="$DATE"
+          if [ -n "$raw" ]; then
+            # Reject anything that is not a real calendar date rather than
+            # silently cutting a branch named after a typo.
+            if ! date -u -d "$raw" +%Y-%m-%d >/dev/null 2>&1; then
+              echo "::error::'$raw' is not a valid YYYY-MM-DD date."
+              exit 1
+            fi
+            stamp=$(date -u -d "$raw" +%Y.%m.%d)
+          else
+            stamp=$(date -u +%Y.%m.%d)
+          fi
+          branch="releases/rc-${stamp}"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Cutting $branch from $SOURCE"
+
+      - name: Cut and push
+        env:
+          BRANCH: ${{ steps.resolve.outputs.branch }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          branch="$BRANCH"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::error::$branch already exists on origin. Release branches are \
+          freeze points and are never re-cut — pick another date, or delete the \
+          existing branch deliberately."
+            exit 1
+          fi
+          git branch "$branch" HEAD
+          git push origin "$branch"
+          sha=$(git rev-parse --short "$branch")
+
+          {
+            echo "### Release branch cut"
+            echo ""
+            echo "| Branch | Source | Commit |"
+            echo "|---|---|---|"
+            echo "| \`$branch\` | \`$SOURCE\` | \`$sha\` |"
+            echo ""
+            echo "Deploy it to a staging environment, verify, then publish a tag"
+            echo "with **Release - Publish** pointed at this branch."
+          } >> "$GITHUB_STEP_SUMMARY"

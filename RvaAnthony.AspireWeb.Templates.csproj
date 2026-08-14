@@ -1,0 +1,89 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NuGet packaging for the template itself. This project contains no code: it packs
+    the repository's own content as `dotnet new` template content, so the starter can
+    be installed with
+
+      dotnet new install RvaAnthony.AspireWeb.Templates
+
+    instead of requiring a clone and a path.
+
+    THIS FILE MUST NOT SHIP. It is in the first source's exclude list in
+    .template.config/template.json, and it excludes itself from its own Content glob
+    below — a stamped app that inherited a packaging project would try to publish
+    itself to NuGet under this id.
+
+    It is deliberately NOT in Template.slnx, so `dotnet build`, `dotnet format` and
+    `eng/verify.ps1` all ignore it. Packing is therefore not covered by the local
+    gate; the `pack` job in .github/workflows/build-and-test.yml is what proves
+    packaging still works, by installing the produced package and stamping from it.
+  -->
+
+  <PropertyGroup>
+    <PackageId>RvaAnthony.AspireWeb.Templates</PackageId>
+    <PackageType>Template</PackageType>
+    <Title>Layered Aspire Web Starter</Title>
+    <Description>A dotnet new template for layered .NET Aspire web solutions: an ASP.NET Core MVC client with rate limiting, security headers, correlation ids and health endpoints; Business/Data/Common layers with the dependency direction enforced at build time; xUnit tests with architecture guardrails and ratcheted coverage floors; and optional Microsoft Entra ID sign-in, Sentry, a background worker, and Azure Tables, PostgreSQL or SQL Server persistence.</Description>
+    <Authors>rvaanthony</Authors>
+    <PackageTags>dotnet-new;template;templates;aspire;aspnetcore;mvc;architecture</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/rvaanthony/aspire-guardrails</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rvaanthony/aspire-guardrails</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <!-- Version comes from Directory.Build.props so there is one place for it.
+         The publish workflow overrides it with p:PackageVersion for a release. -->
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!--
+      Without this, NuGet applies its default exclusions and drops every path
+      beginning with a dot — which silently removes .template.config/, the one
+      directory the package cannot be missing. The package would build, install, and
+      offer no templates at all.
+    -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!--
+      The default Compile glob would otherwise pull in every .cs file in the
+      repository, across every project, only to pack none of them.
+    -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <!--
+      NU5128  No lib/ or ref/ assemblies in the package. Correct for a template.
+      NU5110  A .ps1 outside tools/ "will not be executed during installation".
+      NU5111  A .ps1 not named install/uninstall/init.ps1, same reason.
+
+      The last two are about the packages.config-era install-script convention, which
+      a template package has nothing to do with: eng/verify.ps1 and
+      eng/coverage-floor.ps1 are content meant to land in the generated app and be run
+      by a developer, never by NuGet. Suppressed rather than worked around — moving
+      them to tools/ would take them out of the generated app, which is the only place
+      they are useful. TreatWarningsAsErrors in Directory.Build.props is what makes
+      this suppression necessary rather than cosmetic.
+    -->
+    <NoWarn>$(NoWarn);NU5128;NU5110;NU5111</NoWarn>
+    <!-- Nothing here is a library, so the layer map does not apply. -->
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The template source tree is this repository. What gets excluded from a STAMPED
+      APP is decided by .template.config/template.json at instantiation time, not
+      here — so this glob stays faithful to the tree and only drops build output,
+      local state, and this file.
+    -->
+    <Content Include="**\*"
+             Exclude="**\bin\**;**\obj\**;.git\**;.vs\**;**\TestResults\**;**\*.nupkg;**\*.user;.claude\settings.local.json;$(MSBuildThisFileName)$(MSBuildThisFileExtension)" />
+
+    <!-- Packed at the package root as well, for the NuGet gallery landing page. -->
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

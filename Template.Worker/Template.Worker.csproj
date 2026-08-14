@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>9b2e6f14-3a7d-4c89-b0e5-6f1d8a4c9b23</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Template.Business\Template.Business.csproj" />
+    <ProjectReference Include="..\Template.Common\Template.Common.csproj" />
+    <ProjectReference Include="..\Template.Data\Template.Data.csproj" />
+    <ProjectReference Include="..\Template.ServiceDefaults\Template.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,128 @@
+# Solution-wide formatting + analyzer severities.
+# EnforceCodeStyleInBuild=true (set in Directory.Build.props) makes Roslyn
+# surface code-style DIAGNOSTIC rules (the dotnet_diagnostic.* severities
+# below) as build warnings/errors. Pure formatting rules (using-directive
+# sorting/placement, whitespace) are IDE0055 and are NOT caught by a plain
+# build — they need `dotnet format` or an IDE editor, which honors every rule
+# in this file automatically.
+#
+# WHAT CI ACTUALLY CHECKS, and where this file's authority stops.
+# eng/verify.ps1 runs `dotnet format whitespace --verify-no-changes`, so the
+# whitespace half of IDE0055 (including line endings) is enforced and the
+# using-ORDER half is not. That is deliberate and it is not a matter of taste:
+# every project here is named after the app, so whether `using <App>.Common;`
+# belongs above or below `using Microsoft...;` depends on the app's name. No
+# fixed order in the source is right for every name. The settings below still
+# apply in your IDE and to a manual `dotnet format` — they just are not a gate.
+#
+# Severity ladder we use:
+#   error    — fail the build. Reserve for real correctness problems.
+#   warning  — surfaces in CI but does not fail (Treat-As-Errors elevates).
+#   suggestion — IDE-only nudge.
+#   silent / none — disabled.
+
+root = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# General formatting (every file)
+# ─────────────────────────────────────────────────────────────────────────────
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,md,css,scss,html,cshtml,js,jsx,ts,tsx,mjs,cjs,csproj}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# — formatting + analyzers
+# ─────────────────────────────────────────────────────────────────────────────
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# Modern language usage. Style preferences are kept at "suggestion" so the IDE
+# nudges contributors but the build does not fail on cosmetic differences.
+# Correctness rules (nullability, async, dead code) below stay at "warning" so
+# Treat-Warnings-As-Errors makes them load-bearing.
+csharp_prefer_braces = true:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+csharp_style_expression_bodied_properties = when_on_single_line:silent
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Nullability — already enabled per-csproj; surface violations as warnings so
+# Treat-Warnings-As-Errors makes them load-bearing.
+dotnet_diagnostic.CS8600.severity = warning
+dotnet_diagnostic.CS8601.severity = warning
+dotnet_diagnostic.CS8602.severity = warning
+dotnet_diagnostic.CS8603.severity = warning
+dotnet_diagnostic.CS8604.severity = warning
+dotnet_diagnostic.CS8618.severity = warning
+dotnet_diagnostic.CS8625.severity = warning
+
+# Async correctness.
+dotnet_diagnostic.CS1998.severity = warning   # async without await
+dotnet_diagnostic.CS4014.severity = warning   # call not awaited
+
+# Dead-code.
+dotnet_diagnostic.CS0168.severity = warning   # variable declared but not used
+dotnet_diagnostic.CS0219.severity = warning   # variable assigned but not used
+dotnet_diagnostic.CS8321.severity = warning   # unused local function
+
+# Roslyn analyzers (CA*) — conservative defaults: warn for correctness issues,
+# silence the stylistic ones we don't want to chase.
+# Correctness / reliability — warning.
+dotnet_diagnostic.CA1001.severity = warning   # IDisposable type without IDisposable interface
+dotnet_diagnostic.CA1816.severity = warning   # Dispose methods should call SuppressFinalize
+dotnet_diagnostic.CA2007.severity = none      # ConfigureAwait — n/a for ASP.NET Core
+dotnet_diagnostic.CA2016.severity = warning   # forward CancellationToken
+dotnet_diagnostic.CA2208.severity = warning   # ArgumentException constructors
+dotnet_diagnostic.CA2254.severity = none      # log message format strings shouldn't have to be static — too many false positives with structured logs
+
+# Performance — warning where cheap, off where it'd churn unrelated code.
+dotnet_diagnostic.CA1822.severity = none      # mark members as static — noisy in MVC controllers
+dotnet_diagnostic.CA1825.severity = warning   # Array.Empty<T>()
+dotnet_diagnostic.CA1860.severity = warning   # use Length/Count over Any()
+
+# Naming / style — silent. Not rewriting public API surfaces just for these.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1720.severity = none
+
+# Globalization — silent. App is en-US, single locale.
+dotnet_diagnostic.CA1303.severity = none
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1307.severity = none
+dotnet_diagnostic.CA1308.severity = none
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1311.severity = none
+
+# Documentation — silent. We don't ship XML docs.
+dotnet_diagnostic.CS1591.severity = none      # missing XML comment
+
+# Security — keep loud.
+dotnet_diagnostic.CA5350.severity = warning
+dotnet_diagnostic.CA5351.severity = warning
+dotnet_diagnostic.CA5394.severity = warning   # insecure RNG
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-tree overrides
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Razor views: nullable-reference flow analysis crosses view-rendering
+# boundaries unreliably (Model.Foo inside @if (Model != null) { ... } can
+# still flag CS8602). The analyzer noise is not actionable from the .cshtml source.
+# Real null-deref bugs in views surface at render time instead.
+[*.cshtml]
+dotnet_diagnostic.CS8602.severity = none
+dotnet_diagnostic.CS8618.severity = none

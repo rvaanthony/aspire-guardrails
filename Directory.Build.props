@@ -1,0 +1,118 @@
+<Project>
+
+  <!--
+    Solution-wide build defaults. Importing project (.csproj) settings still win
+    when they explicitly set a property, but anything not specified picks up these
+    defaults. Two goals:
+      1. Treat warnings as errors so a future regression (null-deref, missing
+         override, dead code) fails the build instead of accumulating silently.
+      2. Activate Roslyn code-style enforcement so .editorconfig severities are
+         honored at build time (not just in the IDE).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Version>1.0.0</Version>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)'=='true'">true</ContinuousIntegrationBuild>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!--
+      NuGetAudit reports known-vulnerable packages as NU1900-series warnings,
+      which TreatWarningsAsErrors above would otherwise turn into build breaks —
+      too blunt an instrument for a scheduled restore that picks up a fresh CVE.
+      Keep them as visible warnings; eng/verify.ps1 is the actual pass/fail gate.
+    -->
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <!--
+      MUST stay false, and stated rather than defaulted so turning it on is a visible
+      edit. Microsoft.Data.SqlClient throws NotSupportedException from
+      SqlConnection.TryOpen before it resolves DNS or opens a socket, so with this true
+      EVERY database call fails regardless of the connection string or the server. It
+      reads as a harmless size optimization and produces no build or restore warning —
+      only a runtime failure that looks like a connectivity problem. ARCH0003 in
+      Directory.Build.targets makes it a build error. Costs nothing to leave off: the
+      Linux runtime image already ships libicu.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!--
+    Layer map — the single source of truth for allowed project references. A project
+    may only reference projects of a STRICTLY LOWER rank, validated at build time by
+    ValidateLayering in Directory.Build.targets (ARCH0001/ARCH0002).
+
+      10  Common          Contracts, models, interfaces. References nothing.
+      20  ServiceDefaults Aspire cross-cutting (OpenTelemetry, health, discovery).
+      30  Business        Domain services and options.
+      40  Data            Store and DbContext implementations of Common interfaces.
+      90  Hosts           Client, Worker — deployables. Must NOT reference each other.
+      95  AppHost         Aspire orchestrator; the only project that may reference hosts.
+     100  Tests           May reference anything.
+
+    Equal ranks cannot reference each other, which is what stops one host depending on
+    another to "share" a helper; shared code moves DOWN instead. The map is coarser
+    than Template.Client.Tests/ArchitectureTests.cs, which pins each project's exact
+    reference list — keep both, since the map catches an illegal edge the moment it is
+    written and the test catches a legal-but-unintended one.
+
+    Rows for optional projects stay listed when those projects are absent: an unused
+    row is inert, a missing one is an ARCH0001 failure the moment it comes back.
+  -->
+  <ItemGroup>
+    <TemplateLayer Include="Template.Common"          Rank="10" />
+    <TemplateLayer Include="Template.ServiceDefaults" Rank="20" />
+    <TemplateLayer Include="Template.Business"        Rank="30" />
+    <TemplateLayer Include="Template.Data"            Rank="40" />
+    <TemplateLayer Include="Template.Client"          Rank="90" />
+    <TemplateLayer Include="Template.Worker"          Rank="90" />
+    <TemplateLayer Include="Template.AppHost"         Rank="95" />
+    <TemplateLayer Include="Template.AppHost.Tests"   Rank="100" />
+    <TemplateLayer Include="Template.Business.Tests"  Rank="100" />
+    <TemplateLayer Include="Template.Client.Tests"    Rank="100" />
+    <TemplateLayer Include="Template.Data.Tests"      Rank="100" />
+    <TemplateLayer Include="Template.Worker.Tests"    Rank="100" />
+  </ItemGroup>
+
+  <!--
+    Test projects intentionally exercise edge cases: nullable args, disposable
+    fixtures owned by xUnit's lifecycle, null-bang assertions that xUnit's own
+    Assert failure already covers. These design rules add noise without catching
+    real product bugs, so demote them to warnings only for *.Tests projects.
+
+      CA1001: 'Type owns disposable field but is not disposable' — xUnit's
+              IClassFixture / IAsyncLifetime hosts the disposable lifecycle.
+      CA1816: 'Dispose should call GC.SuppressFinalize' — test classes don't
+              have finalizers and are short-lived.
+      CS8604: 'Possible null argument' — xUnit assertion helpers accept the
+              argument and produce the assertion failure themselves.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1001;CA1816;CS8604</WarningsNotAsErrors>
+    <!--
+      Points every test project at coverage.runsettings. A property rather than a flag
+      on the command line, so a bare `dotnet test` measures what CI measures and there
+      is only one command to keep in step. Conditioned on being empty so an explicit
+      -p:RunSettingsFilePath=... still wins; use the -p form to override, because the
+      `settings` flag binds a different property (VSTestSetting).
+
+      NOTE FOR EDITORS: a double hyphen cannot appear inside an XML comment. It is not
+      a warning — this file fails to parse, and every project then reports NU1015 as
+      though Central Package Management had broken. Write flag names without their
+      leading dashes here.
+    -->
+    <RunSettingsFilePath Condition="'$(RunSettingsFilePath)' == ''">$(MSBuildThisFileDirectory)coverage.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

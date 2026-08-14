@@ -1,0 +1,30 @@
+{
+  "name": "Layered Aspire Web",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-10.0-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "dotnet.defaultSolution": "Template.slnx"
+      }
+    }
+  },
+  "forwardPorts": [8080, 8081],
+  "postCreateCommand": "dotnet restore Template.slnx && (test ! -f .config/dotnet-tools.json || dotnet tool restore)",
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb"
+  }
+}

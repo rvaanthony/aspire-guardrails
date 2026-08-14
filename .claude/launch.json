@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "apphost",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Template.AppHost", "--launch-profile", "http"],
+      "port": 15282
+    },
+    {
+      "name": "client-no-docker",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Template.Client", "--launch-profile", "http", "--", "--environment", "Testing"],
+      "port": 5183
+    }
+  ]
+}

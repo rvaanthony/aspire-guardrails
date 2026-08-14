@@ -1,0 +1,10 @@
+# Keeps blank issues available — a question or a small correction should not have
+# to be forced into the bug or feature shape.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/rvaanthony/aspire-guardrails/security/advisories/new
+    about: Please report security issues privately as a draft advisory, not as a public issue. See SECURITY.md.
+  - name: Question or idea
+    url: https://github.com/rvaanthony/aspire-guardrails/discussions
+    about: For usage questions and open-ended ideas. Enable Discussions in repository settings if this link 404s.

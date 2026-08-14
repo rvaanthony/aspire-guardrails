@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Template.Business\Template.Business.csproj" />
+    <ProjectReference Include="..\Template.Common\Template.Common.csproj" />
+  </ItemGroup>
+
+  <!--#if (UsePostgres)-->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <!--#elif (UseSqlServer)-->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" />
+  </ItemGroup>
+  <!--#else-->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+    <PackageReference Include="Aspire.Azure.Storage.Queues" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+  </ItemGroup>
+  <!--#endif-->
+  <!--#if (UseEfCore)-->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+  <!--#endif-->
+
+</Project>

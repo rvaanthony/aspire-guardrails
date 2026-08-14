@@ -1,0 +1,304 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET (build + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      # global.json is the single source of truth for the SDK version, so CI
+      # installs exactly what developers run. A floating '10.x' would let CI
+      # drift onto a feature band nobody has locally, which turns an SDK
+      # regression into a CI-only failure.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+            Directory.Build.props
+            Directory.Build.targets
+            global.json
+
+      - name: Verify
+        shell: pwsh
+        run: ./eng/verify.ps1
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: |
+            **/TestResults/*.trx
+            **/TestResults/**/coverage.cobertura.xml
+          retention-days: 14
+
+  template-stamp:
+    name: Stamp template (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: dotnet
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        # `project` is the name the solution is created under, and it is a REAL
+        # variable rather than a cosmetic one: it becomes the namespace prefix on
+        # every project, so its alphabetical position changes the correct sort order
+        # of using directives relative to `Microsoft...`. A suite that only ever
+        # created names sorting AFTER "Microsoft" hid a defect that broke roughly
+        # every name from A to L. So the values below straddle it deliberately —
+        # `Acme` sorts before, `Zenith` after — and at least one of each must stay.
+        include:
+          - name: default
+            project: Acme
+            args: ""
+          - name: azuread-sentry
+            project: Zenith
+            args: "--auth azuread --logging sentry"
+          - name: postgres
+            project: Acme
+            args: "--data postgres"
+          - name: sqlserver
+            project: Zenith
+            args: "--data sqlserver"
+          - name: worker-postgres
+            project: Acme
+            args: "--worker --data postgres"
+          - name: efcore-alias
+            project: Acme
+            args: "--data efcore"
+            buildOnly: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # The templating engine evaluates an MSBuild Condition attribute as though it
+      # were one of this repository's own option conditions whenever the expression
+      # contains no $(...) reference. An item-list test like '@(Foo)' != '' is
+      # therefore STRIPPED from the stamped output (leaving a task that always
+      # runs), and the == form deletes the whole element. Neither shows up here:
+      # this repository builds the file as written.
+      #
+      # So: every Condition in a shipped MSBuild file must reference a property.
+      - name: Lint shipped MSBuild conditions
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r file; do
+            # One Condition attribute per match; flag any whose value has no $(.
+            while IFS= read -r cond; do
+              case "$cond" in
+                *'$('*) ;;
+                *) echo "::error file=$file::Condition without a \$(property) reference, which the templating engine will rewrite: $cond"; bad=1 ;;
+              esac
+            done < <(grep -oE 'Condition="[^"]*"' "$file" || true)
+          done < <(find . -name 'Directory.Build.*props' -o -name 'Directory.Build.*targets' -o -name '*.csproj' \
+                     | grep -v -E '(^\./stamp/|/bin/|/obj/)')
+          [ "$bad" -eq 0 ] || exit 1
+          echo "All shipped MSBuild conditions reference a property."
+
+      - name: Install template
+        run: dotnet new install . --force
+
+      - name: Stamp
+        run: |
+          out="${RUNNER_TEMP}/stamp-${{ matrix.name }}"
+          # shellcheck disable=SC2086
+          dotnet new aspire-web -n "${{ matrix.project }}" -o "$out" ${{ matrix.args }}
+          echo "STAMP_DIR=$out" >> "$GITHUB_ENV"
+
+      - name: Verify stamp output
+        working-directory: ${{ env.STAMP_DIR }}
+        run: |
+          set -euo pipefail
+
+          for f in \
+            .github/workflows/build-and-test.yml \
+            .github/workflows/deploy-azure.yml \
+            .github/workflows/codeql.yml \
+            .github/workflows/release-cut.yml \
+            .github/workflows/release-publish.yml \
+            .github/dependabot.yml \
+            .github/CODEOWNERS \
+            README.md \
+            CONTRIBUTING.md \
+            eng/verify.ps1 \
+            coverage.runsettings \
+            Directory.Build.targets \
+          ; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Expected staged file missing: $f"
+              exit 1
+            fi
+          done
+
+          if [ -d stamp ] || [ -d .template.config ]; then
+            echo "::error::stamp/ or .template.config/ leaked into stamped output"
+            exit 1
+          fi
+
+          # Backstop for the condition-rewriting trap the lint step above prevents,
+          # and for any future trigger nobody has found yet: these two files carry no
+          # conditional blocks, so their Condition count must survive stamping
+          # unchanged. A comment can trigger it too — a comment that merely *quotes*
+          # the offending syntax took out the surrounding element once.
+          for f in Directory.Build.props Directory.Build.targets; do
+            want=$(grep -c 'Condition=' "${GITHUB_WORKSPACE}/$f" || true)
+            got=$(grep -c 'Condition=' "$f" || true)
+            if [ "$want" != "$got" ]; then
+              echo "::error::$f lost MSBuild conditions during stamping: $want in source, $got in output."
+              exit 1
+            fi
+          done
+
+          if residue=$(grep -RIl 'Template\.' . --exclude-dir=.git); then
+            echo "::error::Un-substituted 'Template.' residue found:"
+            echo "$residue"
+            exit 1
+          fi
+
+      # The stamped app's OWN gate, not a bare `dotnet test`, and that distinction
+      # is load-bearing: verify.ps1 adds the whitespace/line-ending check, the
+      # coverage floors and the vulnerable-package scan, and each of those has
+      # already caught a defect that only exists in generated output and cannot be
+      # reproduced in this repository. Running the generated app's own gate is the
+      # only way to see them.
+      #
+      # No test filter. Data.Tests need Docker (Azurite, Postgres, or SQL Server)
+      # and GHA runners provide it; AppHost.Tests inspect the Aspire resource graph
+      # in process and need nothing.
+      #
+      # efcore-alias only proves the --data efcore alias resolves and builds; the
+      # postgres entry already covers that code path's test suite.
+      - name: Verify stamped solution
+        working-directory: ${{ env.STAMP_DIR }}
+        shell: pwsh
+        run: |
+          if ('${{ matrix.buildOnly }}' -eq 'true') {
+            dotnet build ${{ matrix.project }}.slnx --configuration Release
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          else {
+            ./eng/verify.ps1
+          }
+
+  # Proves the NuGet package still works, by using it rather than inspecting it.
+  #
+  # Packing is not part of eng/verify.ps1 (the packaging project is deliberately
+  # outside Template.slnx), so without this job packaging can rot silently. The
+  # specific failure it catches: NuGet's default exclusions drop every dotted path,
+  # which removes .template.config/ and yields a package that installs cleanly and
+  # offers no templates at all. Only installing and stamping surfaces that.
+  pack:
+    name: Pack (install from package + stamp)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Pack
+        run: dotnet pack RvaAnthony.AspireWeb.Templates.csproj --configuration Release -o ./artifacts
+
+      - name: Install from the produced package
+        run: |
+          set -euo pipefail
+          pkg=$(ls ./artifacts/*.nupkg)
+          echo "Installing $pkg"
+          dotnet new install "$pkg"
+
+      - name: Stamp from the installed package
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/from-package"
+          dotnet new aspire-web -n Acme -o "$out" --worker
+          echo "STAMP_DIR=$out" >> "$GITHUB_ENV"
+
+      - name: Verify what the package produced
+        working-directory: ${{ env.STAMP_DIR }}
+        run: |
+          set -euo pipefail
+
+          # The packaging project must never reach a generated app — one that
+          # inherited it would try to publish itself to NuGet under this id.
+          for f in RvaAnthony.AspireWeb.Templates.csproj CODE_OF_CONDUCT.md; do
+            if [ -e "$f" ]; then
+              echo "::error::$f leaked out of the package into the stamped app"
+              exit 1
+            fi
+          done
+
+          if [ -d stamp ] || [ -d .template.config ]; then
+            echo "::error::stamp/ or .template.config/ leaked into stamped output"
+            exit 1
+          fi
+
+          # CONTRIBUTING.md must be the staged one, not this repository's own.
+          if grep -q 'dotnet new' CONTRIBUTING.md && grep -q 'stamp/' CONTRIBUTING.md; then
+            echo "::error::CONTRIBUTING.md looks like this repository's copy, not the staged one"
+            exit 1
+          fi
+
+          for f in Directory.Build.targets coverage.runsettings eng/verify.ps1 eng/coverage-floor.ps1; do
+            [ -f "$f" ] || { echo "::error::Expected content missing from the package: $f"; exit 1; }
+          done
+
+      - name: Build what the package produced
+        working-directory: ${{ env.STAMP_DIR }}
+        run: dotnet build Acme.slnx --configuration Release
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: template-package
+          path: ./artifacts/*.nupkg
+          retention-days: 14
+
+  # Guards Template.Client/Dockerfile against the Central Package Management
+  # trap: restore inside the image needs every ProjectReference target present
+  # before `COPY . .`, so the csproj COPY block is hand-maintained. Add a project
+  # reference without updating it and `dotnet build`/`dotnet test` both stay
+  # green while the container build breaks — this job is what notices.
+  #
+  # The COPY block does not vary by stamp option (the options change package
+  # references, not project references), so building the default configuration
+  # once covers every variant.
+  docker:
+    name: Docker (client image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build client image
+        run: docker build -f Template.Client/Dockerfile -t template-client:ci .

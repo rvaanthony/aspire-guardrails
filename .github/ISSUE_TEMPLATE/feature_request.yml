@@ -1,0 +1,51 @@
+name: Feature request
+description: Suggest something the starter should include, or an option it should offer.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every addition ships into every project generated from this starter, so the
+        useful question is usually not "is this good?" but "should this be here by
+        default, behind an option, or documented and left out?" Say which you think
+        it is and why.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: The situation you hit, rather than the solution you have in mind. What did you end up doing by hand?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: What the starter would include, and roughly where it would live.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shape
+    attributes:
+      label: How should it ship?
+      options:
+        - On by default, for every generated project
+        - Behind a new option, off by default
+        - Behind an existing option
+        - Documentation only, not code
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it would cost
+      description: |
+        Optional, and genuinely useful. New dependencies, a slower build, a tool
+        contributors must install, another combination CI has to generate and test.
+        A proposal that names its own costs is much easier to say yes to.
+    validations:
+      required: false

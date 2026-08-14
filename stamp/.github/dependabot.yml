@@ -1,0 +1,50 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      aspire:
+        patterns:
+          - "Aspire.*"
+      opentelemetry:
+        patterns:
+          - "OpenTelemetry*"
+      microsoft-extensions:
+        patterns:
+          - "Microsoft.Extensions*"
+      azure-identity:
+        patterns:
+          - "Microsoft.Identity.*"
+          - "Microsoft.AspNetCore.Authentication.OpenIdConnect"
+      test:
+        patterns:
+          - "xunit*"
+          - "coverlet.*"
+          - "Microsoft.NET.Test.Sdk"
+          - "Microsoft.AspNetCore.Mvc.Testing"
+          - "Testcontainers*"
+
+    # EF Core design-time tooling tracks the EF Core runtime that the Aspire
+    # packages pull transitively, not the newest patch. Bumping it independently
+    # builds but emits MSB3277 assembly conflicts — see Directory.Packages.props.
+    ignore:
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+      - dependency-name: "dotnet-ef"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /Template.Client
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly

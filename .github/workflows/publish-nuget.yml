@@ -1,0 +1,165 @@
+name: publish-nuget
+
+# Publishes the template package to NuGet.
+#
+# MANUAL DISPATCH ONLY, deliberately. A published NuGet version is immutable: it
+# cannot be replaced, and an unlisted package is still restorable by anyone who
+# knows the version. There is no tag trigger here precisely so that a tag pushed
+# early cannot ship a version you did not mean to ship.
+#
+# Before first use:
+#   1. Create a NuGet API key scoped to the RvaAnthony.AspireWeb.Templates id
+#      (use "Glob pattern" if the id does not exist yet) and store it as the
+#      NUGET_API_KEY repository secret.
+#   2. Optionally add a required reviewer to the `nuget` environment below, which
+#      turns every publish into an approval step and leaves an audit trail.
+#
+# The package is packed, installed, stamped and built here BEFORE it is pushed.
+# That ordering is the point: the one thing you cannot undo happens last.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version to publish, e.g. 1.1.0. Leave blank to use the Version in Directory.Build.props."
+        required: false
+        type: string
+      dryRun:
+        description: "Pack and verify, but do not push to NuGet."
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-nuget
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: nuget
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Resolve version
+        id: resolve
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="$VERSION_INPUT"
+          if [ -z "$version" ]; then
+            version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n1)
+          fi
+          if [ -z "$version" ]; then
+            echo "::error::Could not resolve a version. Pass one in, or set <Version> in Directory.Build.props."
+            exit 1
+          fi
+          # SemVer 2.0, optionally with a prerelease label. Rejected here rather than
+          # by the NuGet server, because a rejection there can still leave a partially
+          # published state to reason about.
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a valid SemVer version (N.N.N, optionally -label)."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $version"
+
+      - name: Refuse to republish an existing version
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          # A published version is immutable, so pushing an existing one fails at the
+          # server. Checking first turns that into a clear message instead of a 409
+          # buried in push output — and catches the common case of forgetting to bump.
+          url="https://api.nuget.org/v3-flatcontainer/rvaanthony.aspireweb.templates/index.json"
+          if curl -fsS "$url" -o /tmp/versions.json 2>/dev/null; then
+            if jq -e --arg v "$VERSION" '.versions | index($v)' /tmp/versions.json >/dev/null; then
+              echo "::error::Version $VERSION is already published and NuGet versions are immutable. Bump the version."
+              exit 1
+            fi
+            echo "Version $VERSION is not yet published. Latest is $(jq -r '.versions[-1]' /tmp/versions.json)."
+          else
+            echo "Package id not found on NuGet — this would be the first publish."
+          fi
+
+      - name: Pack
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: dotnet pack RvaAnthony.AspireWeb.Templates.csproj --configuration Release -o ./artifacts -p:PackageVersion="$VERSION"
+
+      # Everything below this line runs against the exact bytes that would be
+      # pushed. Verifying the package rather than the repository is the whole point:
+      # the repository has been green for every change that ever broke packaging.
+      - name: Install from the package
+        run: |
+          set -euo pipefail
+          dotnet new install "$(ls ./artifacts/*.nupkg)"
+
+      - name: Stamp and verify
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/publish-check"
+          dotnet new aspire-web -n Acme -o "$out" --worker
+          cd "$out"
+          if [ -d stamp ] || [ -d .template.config ] || [ -e RvaAnthony.AspireWeb.Templates.csproj ]; then
+            echo "::error::the package produces a stamped app containing files that must not ship"
+            exit 1
+          fi
+          dotnet build Acme.slnx --configuration Release
+
+      - name: Push to NuGet
+        if: ${{ inputs.dryRun == false }}
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "::error::NUGET_API_KEY is not set. Add it as a repository secret."
+            exit 1
+          fi
+          dotnet nuget push ./artifacts/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          DRY_RUN: ${{ inputs.dryRun }}
+        run: |
+          {
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "### Dry run — nothing was pushed"
+              echo ""
+              echo "Version \`$VERSION\` packed, installed, stamped and built successfully."
+              echo "Re-run with **dryRun** unchecked to publish it."
+            else
+              echo "### Published \`$VERSION\`"
+              echo ""
+              echo '```bash'
+              echo "dotnet new install RvaAnthony.AspireWeb.Templates::$VERSION"
+              echo '```'
+              echo ""
+              echo "It can take a few minutes to become restorable while NuGet indexes it."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload package
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nuget-package
+          path: ./artifacts/*.nupkg
+          retention-days: 30

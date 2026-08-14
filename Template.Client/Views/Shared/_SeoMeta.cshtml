@@ -1,0 +1,22 @@
+@inject Microsoft.Extensions.Options.IOptions<Template.Client.Seo.SeoOptions> SeoOptionsAccessor
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostEnvironment
+@{
+    var seo = SeoOptionsAccessor.Value;
+    var host = string.IsNullOrWhiteSpace(seo.CanonicalHost) ? Context.Request.Host.ToString() : seo.CanonicalHost;
+    // Routing treats paths case-insensitively and Program.cs sets LowercaseUrls
+    // for generated links, so the canonical tag lowercases too — otherwise
+    // /Contact and /contact would each self-canonicalize instead of pointing
+    // at one URL.
+    var canonicalPath = Context.Request.Path.ToString().ToLowerInvariant();
+    var canonicalUrl = $"https://{host}{canonicalPath}";
+    var shouldIndex = seo.AllowIndexing && HostEnvironment.IsProduction();
+}
+<link rel="canonical" href="@canonicalUrl" />
+@if (!shouldIndex)
+{
+    <meta name="robots" content="noindex, nofollow" />
+}
+@if (ViewData["Description"] is string description)
+{
+    <meta name="description" content="@description" />
+}
