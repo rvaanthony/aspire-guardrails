@@ -13,15 +13,15 @@
 
   <ItemGroup>
     <!-- Aspire -->
-    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.5.4" />
 
     <!-- EF Core design-time tooling (referenced only when the data parameter
          is postgres, sqlserver, or efcore). Pinned to match the EF Core runtime
